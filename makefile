@@ -14,6 +14,7 @@ ifeq ($(simple_find_cuda), 0)
 else
 	siftgpu_enable_cuda = 0
 endif
+siftgpu_enable_cuda = 1
 
 CUDA_INSTALL_PATH = /usr/local/cuda
 #change  additional  settings, like SM version here if it is not 1.0 (eg. -arch sm_13 for GTX280)
@@ -194,7 +195,82 @@ makepath:
 	mkdir -p $(ODIR_SIFTGPU)
 	mkdir -p $(BIN_DIR) 
 	sed -i -e 's/\\/\//g' demos/*.bat
- 
+
+# -----------------------------
+# Installation (for CMake find_package)
+# -----------------------------
+PREFIX        ?= /usr/local
+LIBDIR        ?= $(PREFIX)/lib
+INCLUDEDIR    ?= $(PREFIX)/include/SiftGPU
+CMAKEDIR      ?= $(LIBDIR)/cmake/SiftGPU
+
+# If you want to version your .so later, you can add SONAME/versioning,
+# but keep it simple for now.
+
+install: siftgpu
+	install -d "$(DESTDIR)$(LIBDIR)" "$(DESTDIR)$(INCLUDEDIR)" "$(DESTDIR)$(CMAKEDIR)"
+	# libraries
+	install -m 755 "$(BIN_DIR)/libsiftgpu.so" "$(DESTDIR)$(LIBDIR)/libsiftgpu.so"
+	install -m 644 "$(BIN_DIR)/libsiftgpu.a"  "$(DESTDIR)$(LIBDIR)/libsiftgpu.a"
+	# public header(s)
+	install -m 644 "$(SRC_SIFTGPU)/SiftGPU.h" "$(DESTDIR)$(INCLUDEDIR)/SiftGPU.h"
+
+	# CMake package config so consumers can do: find_package(SiftGPU CONFIG REQUIRED)
+	cat > "$(DESTDIR)$(CMAKEDIR)/SiftGPUConfig.cmake" <<'EOF'
+# Minimal CMake package config for SiftGPU built by a Makefile install.
+# Usage in consumer:
+#   find_package(SiftGPU CONFIG REQUIRED)
+#   target_link_libraries(yourTarget PRIVATE SiftGPU::siftgpu)
+
+get_filename_component(_SIFTGPU_PREFIX "\${CMAKE_CURRENT_LIST_DIR}/../../.." ABSOLUTE)
+
+add_library(SiftGPU::siftgpu SHARED IMPORTED GLOBAL)
+set_target_properties(SiftGPU::siftgpu PROPERTIES
+  IMPORTED_LOCATION "\${_SIFTGPU_PREFIX}/lib/libsiftgpu.so"
+  INTERFACE_INCLUDE_DIRECTORIES "\${_SIFTGPU_PREFIX}/include/SiftGPU"
+)
+
+# Link dependencies. Keep as linker flags to avoid requiring extra CMake packages.
+# Adjust if your build differs (e.g., DevIL disabled/enabled, CUDA on/off).
+if(APPLE)
+  target_link_libraries(SiftGPU::siftgpu INTERFACE
+    -lGLEW
+    -framework GLUT
+    -framework OpenGL
+  )
+else()
+  target_link_libraries(SiftGPU::siftgpu INTERFACE
+    -lGLEW -lglut -lGL -lX11
+  )
+endif()
+
+# DevIL (only if you build with it)
+# If you set siftgpu_disable_devil=1, you can remove this line.
+target_link_libraries(SiftGPU::siftgpu INTERFACE -lIL)
+
+# CUDA runtime (only if you build with CUDA)
+# If you build without CUDA, you can remove this line.
+target_link_libraries(SiftGPU::siftgpu INTERFACE -lcudart)
+EOF
+
+	# Optional: a version file so CMake doesn't complain if someone uses find_package(... VERSION ...)
+	cat > "$(DESTDIR)$(CMAKEDIR)/SiftGPUConfigVersion.cmake" <<'EOF'
+set(PACKAGE_VERSION "0.0.0")
+if(PACKAGE_FIND_VERSION)
+  set(PACKAGE_VERSION_COMPATIBLE TRUE)
+  set(PACKAGE_VERSION_EXACT FALSE)
+endif()
+EOF
+
+	@echo "Installed SiftGPU to $(DESTDIR)$(PREFIX)"
+	@echo "On Linux you may need: sudo ldconfig"
+
+uninstall:
+	rm -f "$(DESTDIR)$(LIBDIR)/libsiftgpu.so" "$(DESTDIR)$(LIBDIR)/libsiftgpu.a"
+	rm -f "$(DESTDIR)$(INCLUDEDIR)/SiftGPU.h"
+	rm -f "$(DESTDIR)$(CMAKEDIR)/SiftGPUConfig.cmake" "$(DESTDIR)$(CMAKEDIR)/SiftGPUConfigVersion.cmake"
+	rmdir --ignore-fail-on-non-empty "$(DESTDIR)$(CMAKEDIR)" "$(DESTDIR)$(INCLUDEDIR)" 2>/dev/null || true
+
 clean:
 	rm -f $(ODIR_SIFTGPU)/*.o
 	rm -f $(BIN_DIR)/libsiftgpu.a
