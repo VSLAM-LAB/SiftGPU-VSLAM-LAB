@@ -78,3 +78,55 @@ target_link_libraries(sift_gpu
         GLEW::GLEW
         ${OPTIONAL_CUDA_LINK_LIBS}
 )
+
+include(GNUInstallDirs)
+include(CMakePackageConfigHelpers)
+
+# Make includes correct for both build-tree and install-tree consumers
+target_include_directories(sift_gpu PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
+  $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
+)
+
+# Install the shared library
+install(TARGETS sift_gpu
+  EXPORT SiftGPUTargets
+  LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+  ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+  RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+  INCLUDES DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+)
+
+# Install headers (simple approach: all .h in source dir)
+install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/
+  DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/SiftGPU
+  FILES_MATCHING PATTERN "*.h"
+)
+
+# ---- CMake package config (for find_package) ----
+set(SIFTGPU_CMAKE_DIR "${CMAKE_INSTALL_LIBDIR}/cmake/SiftGPU")
+
+# Create Config + Version files
+configure_package_config_file(
+  "${CMAKE_CURRENT_SOURCE_DIR}/cmake/SiftGPUConfig.cmake.in"
+  "${CMAKE_CURRENT_BINARY_DIR}/SiftGPUConfig.cmake"
+  INSTALL_DESTINATION ${SIFTGPU_CMAKE_DIR}
+)
+
+write_basic_package_version_file(
+  "${CMAKE_CURRENT_BINARY_DIR}/SiftGPUConfigVersion.cmake"
+  VERSION 1.0
+  COMPATIBILITY SameMajorVersion
+)
+
+# Install exports + config files
+install(EXPORT SiftGPUTargets
+  NAMESPACE SiftGPU::
+  DESTINATION ${SIFTGPU_CMAKE_DIR}
+)
+
+install(FILES
+  "${CMAKE_CURRENT_BINARY_DIR}/SiftGPUConfig.cmake"
+  "${CMAKE_CURRENT_BINARY_DIR}/SiftGPUConfigVersion.cmake"
+  DESTINATION ${SIFTGPU_CMAKE_DIR}
+)
