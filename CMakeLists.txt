@@ -70,8 +70,6 @@ set_target_properties(sift_gpu PROPERTIES
 
 # 7. Linkage and Includes
 # PUBLIC means any project linking to sift_gpu gets these includes/libs too
-target_include_directories(sift_gpu PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
-
 target_link_libraries(sift_gpu
     PUBLIC
         OpenGL::GL
@@ -85,7 +83,7 @@ include(CMakePackageConfigHelpers)
 # Make includes correct for both build-tree and install-tree consumers
 target_include_directories(sift_gpu PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
-  $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
+  $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/SiftGPU>
 )
 
 # Install the shared library
